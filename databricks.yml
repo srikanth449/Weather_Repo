@@ -1,0 +1,51 @@
+bundle:
+  name: weather_intelligence_project
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog_name:
+    description: Target Unity Catalog name per environment
+  warehouse_id:
+    description: SQL Warehouse ID for dashboard and SQL tasks
+  trigger_status:
+    description: Schedule state (PAUSED in dev/uat, UNPAUSED in prod)
+  alert_email:
+    description: Email address for job failure notifications
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-5fa696bd-41fd.cloud.databricks.com
+    variables:
+      catalog_name: weather_cat
+      warehouse_id: df999287e4c7934a
+      trigger_status: UNPAUSED
+      alert_email: srikanth.449@gmail.com 
+
+  uat:
+    mode: production
+    workspace:
+      host: https://<your-uat-workspace-url>
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog_name: weather_cat_uat
+      warehouse_id: <uat-sql-warehouse-id>
+      trigger_status: UNPAUSED
+      alert_email: srikanth.449@gmail.com 
+
+  prod:
+    mode: production
+    workspace:
+      host: https://<your-prod-workspace-url>
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog_name: weather_cat_prod
+      warehouse_id: <prod-sql-warehouse-id>
+      trigger_status: UNPAUSED
+      alert_email: srikanth.449@gmail.com 
+    run_as:
+      service_principal_name: <prod-service-principal-id>

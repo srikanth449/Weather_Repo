@@ -1,0 +1,15 @@
+resources:
+  jobs:
+    weather_setup_job:
+      name: "[${bundle.target}] Weather Intelligence - Setup Tables"
+      parameters:
+        - name: catalog_name
+          default: ${var.catalog_name}
+      tasks:
+        - task_key: setup_tables
+          sql_task:
+            file:
+              path: ../src/01_setup_tables.sql
+              source: WORKSPACE
+            warehouse_id: ${var.warehouse_id}
+      max_concurrent_runs: 1

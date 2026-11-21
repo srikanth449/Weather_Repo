@@ -1,0 +1,5827 @@
+{
+  "datasets": [
+    {
+      "name": "weather_gold",
+      "displayName": "Gold Daily Weather Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  w.forecast_date,\n",
+        "  w.location_id,\n",
+        "  w.city_name,\n",
+        "  w.min_temp_c,\n",
+        "  w.max_temp_c,\n",
+        "  w.avg_temp_c,\n",
+        "  w.min_humidity_pct,\n",
+        "  w.max_humidity_pct,\n",
+        "  w.avg_humidity_pct,\n",
+        "  w.total_precipitation_mm,\n",
+        "  w.max_wind_speed_kmh,\n",
+        "  w.weather_alert,\n",
+        "  w.updated_at,\n",
+        "  dl.department AS department,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      (\n",
+        "        w.max_temp_c < 35\n",
+        "        OR w.avg_humidity_pct < 80\n",
+        "      )\n",
+        "      AND w.max_wind_speed_kmh < 50\n",
+        "      AND w.total_precipitation_mm >= 20\n",
+        "    THEN\n",
+        "      1\n",
+        "    ELSE 0\n",
+        "  END AS rainy_day,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      w.weather_alert IS NOT NULL\n",
+        "      AND TRIM(w.weather_alert) <> ''\n",
+        "    THEN\n",
+        "      1\n",
+        "    ELSE 0\n",
+        "  END AS alert_count,\n",
+        "  CASE\n",
+        "    WHEN w.max_temp_c >= 35 THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS heat_day,\n",
+        "  CASE\n",
+        "    WHEN w.total_precipitation_mm >= 10 THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS heavy_rain_day,\n",
+        "  CASE\n",
+        "    WHEN w.max_wind_speed_kmh >= 50 THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS high_wind_day,\n",
+        "  CASE\n",
+        "    WHEN\n",
+        "      w.avg_temp_c BETWEEN -50 AND 60\n",
+        "      AND w.avg_humidity_pct BETWEEN 0 AND 100\n",
+        "      AND w.total_precipitation_mm >= 0\n",
+        "    THEN\n",
+        "      1\n",
+        "    ELSE 0\n",
+        "  END AS dq_pass\n",
+        "FROM\n",
+        "  gold.daily_weather_summary w\n",
+        "    LEFT JOIN config.department_locations dl\n",
+        "      ON w.location_id = dl.location_id\n",
+        "      AND COALESCE(:department, 'All') <> 'All'\n",
+        "      AND dl.department = :department\n",
+        "WHERE\n",
+        "  w.forecast_date BETWEEN :start_date AND :end_date\n",
+        "  AND (\n",
+        "    (\n",
+        "      current_user() = 'srikanth.449@gmail.com'\n",
+        "      AND (\n",
+        "        COALESCE(:department, 'All') = 'All'\n",
+        "        OR w.location_id IN (\n",
+        "          SELECT dl2.location_id\n",
+        "          FROM config.department_locations dl2\n",
+        "          WHERE dl2.department = :department\n",
+        "        )\n",
+        "      )\n",
+        "    )\n",
+        "    OR (\n",
+        "      current_user() <> 'srikanth.449@gmail.com'\n",
+        "      AND w.location_id IN (\n",
+        "        SELECT l.location_id\n",
+        "        FROM config.locations l\n",
+        "        WHERE COALESCE(:department, 'All') = 'All'\n",
+        "          OR l.location_id IN (\n",
+        "            SELECT dl2.location_id\n",
+        "            FROM config.department_locations dl2\n",
+        "            WHERE dl2.department = :department\n",
+        "          )\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "  AND (\n",
+        "    COALESCE(:city_name, 'All') = 'All'\n",
+        "    OR w.city_name = :city_name\n",
+        "  )\n",
+        "  AND (\n",
+        "    COALESCE(:location_id, 'All') = 'All'\n",
+        "    OR w.location_id = :location_id\n",
+        "  )"
+      ],
+      "parameters": [
+        {
+          "displayName": "Start Date",
+          "keyword": "start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-30d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "End Date",
+          "keyword": "end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2027-12-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "City",
+          "keyword": "city_name",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Location",
+          "keyword": "location_id",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Department",
+          "keyword": "department",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "columns": [
+        {
+          "displayName": "dq_pass_rate",
+          "description": "Percentage of gold rows passing all range validations (temperature -50 to 60 C, humidity 0-100 pct, precipitation >= 0).",
+          "expression": "SUM(dq_pass) * 100.0 / COUNT(*)"
+        }
+      ]
+    },
+    {
+      "name": "pipeline_runs",
+      "displayName": "Pipeline Runs",
+      "queryLines": [
+        "SELECT\n",
+        "  run_id,\n",
+        "  start_time,\n",
+        "  end_time,\n",
+        "  status,\n",
+        "  parameters,\n",
+        "  locations_attempted,\n",
+        "  locations_succeeded,\n",
+        "  silver_rows_merged,\n",
+        "  quarantined_rows,\n",
+        "  error_message,\n",
+        "  CASE\n",
+        "    WHEN LOWER(status) LIKE 'succ%' THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS run_success,\n",
+        "  CASE\n",
+        "    WHEN LOWER(status) NOT LIKE 'succ%' THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS run_failed,\n",
+        "  ROUND((UNIX_TIMESTAMP(end_time) - UNIX_TIMESTAMP(start_time)) / 60.0, 1) AS duration_minutes,\n",
+        "  CAST(start_time AS DATE) AS run_date\n",
+        "FROM\n",
+        "  audit.pipeline_runs\n",
+        "ORDER BY\n",
+        "  start_time DESC"
+      ]
+    },
+    {
+      "name": "location_audit",
+      "displayName": "Location Audit",
+      "queryLines": [
+        "SELECT\n",
+        "  run_id,\n",
+        "  location_id,\n",
+        "  city_name,\n",
+        "  status,\n",
+        "  http_status,\n",
+        "  CAST(http_status AS STRING) AS http_status_code,\n",
+        "  rows_extracted,\n",
+        "  schema_changes,\n",
+        "  error_message,\n",
+        "  logged_at\n",
+        "FROM\n",
+        "  audit.location_audit\n",
+        "ORDER BY\n",
+        "  logged_at DESC"
+      ]
+    },
+    {
+      "name": "weather_quarantine",
+      "displayName": "Weather Quarantine",
+      "queryLines": [
+        "SELECT\n",
+        "  quarantine_id,\n",
+        "  run_id,\n",
+        "  stage,\n",
+        "  location_id,\n",
+        "  forecast_ts,\n",
+        "  quarantine_reason,\n",
+        "  SUBSTR(raw_record, 1, 120) AS raw_record_preview,\n",
+        "  quarantined_at\n",
+        "FROM\n",
+        "  quarantine.weather_quarantine\n",
+        "ORDER BY\n",
+        "  quarantined_at DESC"
+      ]
+    },
+    {
+      "name": "locations_config",
+      "displayName": "Locations Config",
+      "queryLines": [
+        "SELECT\n",
+        "  location_id,\n",
+        "  city_name,\n",
+        "  country,\n",
+        "  latitude,\n",
+        "  longitude,\n",
+        "  is_active,\n",
+        "  CASE\n",
+        "    WHEN is_active THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS active_flag\n",
+        "FROM\n",
+        "  config.locations"
+      ]
+    },
+    {
+      "name": "data_health",
+      "displayName": "Data Health Summary",
+      "queryLines": [
+        "WITH s AS (\n",
+        "  SELECT\n",
+        "    (\n",
+        "      SELECT\n",
+        "        MAX(end_time)\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS last_run_time,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COUNT(*)\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS total_runs,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        SUM(\n",
+        "          CASE\n",
+        "            WHEN LOWER(status) LIKE 'succ%' THEN 1\n",
+        "            ELSE 0\n",
+        "          END\n",
+        "        )\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS successful_runs,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        SUM(\n",
+        "          CASE\n",
+        "            WHEN LOWER(status) NOT LIKE 'succ%' THEN 1\n",
+        "            ELSE 0\n",
+        "          END\n",
+        "        )\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS failed_runs,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COALESCE(SUM(silver_rows_merged), 0)\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS rows_loaded,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COALESCE(SUM(quarantined_rows), 0)\n",
+        "      FROM\n",
+        "        audit.pipeline_runs\n",
+        "    ) AS rows_rejected,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COUNT(*)\n",
+        "      FROM\n",
+        "        quarantine.weather_quarantine\n",
+        "    ) AS quarantine_count,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        ROUND((UNIX_TIMESTAMP(current_timestamp()) - UNIX_TIMESTAMP(MAX(updated_at))) / 3600.0, 1)\n",
+        "      FROM\n",
+        "        gold.daily_weather_summary\n",
+        "    ) AS freshness_hours,\n",
+        "    (\n",
+        "      SELECT\n",
+        "        MAX(updated_at)\n",
+        "      FROM\n",
+        "        gold.daily_weather_summary\n",
+        "    ) AS last_refresh_time\n",
+        ")\n",
+        "SELECT\n",
+        "  s.*,\n",
+        "  ROUND(s.successful_runs * 100.0 / NULLIF(s.total_runs, 0), 1) AS success_rate_pct,\n",
+        "  ROUND(s.failed_runs * 100.0 / NULLIF(s.total_runs, 0), 1) AS failure_rate_pct,\n",
+        "  CASE\n",
+        "    WHEN s.freshness_hours <= 24 THEN 'Fresh'\n",
+        "    ELSE 'Stale'\n",
+        "  END AS freshness_status\n",
+        "FROM\n",
+        "  s"
+      ]
+    },
+    {
+      "name": "dq_checks",
+      "displayName": "Data Quality Checks",
+      "queryLines": [
+        "WITH silver_window AS (\n",
+        "  SELECT\n",
+        "    *\n",
+        "  FROM\n",
+        "    silver.weather_hourly\n",
+        "  WHERE\n",
+        "    CAST(forecast_ts AS DATE) BETWEEN :start_date AND :end_date\n",
+        "    AND (\n",
+        "      COALESCE(:city_name, 'All') = 'All'\n",
+        "      OR city_name = :city_name\n",
+        "    )\n",
+        "    AND (\n",
+        "      COALESCE(:location_id, 'All') = 'All'\n",
+        "      OR location_id = :location_id\n",
+        "    )\n",
+        "),\n",
+        "gold_window AS (\n",
+        "  SELECT\n",
+        "    *\n",
+        "  FROM\n",
+        "    gold.daily_weather_summary\n",
+        "  WHERE\n",
+        "    forecast_date BETWEEN :start_date AND :end_date\n",
+        "    AND (\n",
+        "      COALESCE(:city_name, 'All') = 'All'\n",
+        "      OR city_name = :city_name\n",
+        "    )\n",
+        "    AND (\n",
+        "      COALESCE(:location_id, 'All') = 'All'\n",
+        "      OR location_id = :location_id\n",
+        "    )\n",
+        "),\n",
+        "duplicate_silver_keys AS (\n",
+        "  SELECT\n",
+        "    location_id,\n",
+        "    forecast_ts\n",
+        "  FROM\n",
+        "    silver_window\n",
+        "  GROUP BY\n",
+        "    location_id,\n",
+        "    forecast_ts\n",
+        "  HAVING\n",
+        "    COUNT(*) > 1\n",
+        "),\n",
+        "duplicate_gold_keys AS (\n",
+        "  SELECT\n",
+        "    forecast_date,\n",
+        "    location_id\n",
+        "  FROM\n",
+        "    gold_window\n",
+        "  GROUP BY\n",
+        "    forecast_date,\n",
+        "    location_id\n",
+        "  HAVING\n",
+        "    COUNT(*) > 1\n",
+        "),\n",
+        "checks AS (\n",
+        "  SELECT\n",
+        "    'Null Checks' AS check_category,\n",
+        "    'Null temperature_2m' AS check_name,\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN temperature_2m IS NULL THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ) AS violations,\n",
+        "    COUNT(*) AS rows_checked,\n",
+        "    'NULL temperature_2m values in silver.weather_hourly' AS details\n",
+        "  FROM\n",
+        "    silver_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Null Checks',\n",
+        "    'Null relative_humidity_2m',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN relative_humidity_2m IS NULL THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'NULL relative_humidity_2m values in silver.weather_hourly'\n",
+        "  FROM\n",
+        "    silver_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Null Checks',\n",
+        "    'Null precipitation',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN precipitation IS NULL THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'NULL precipitation values in silver.weather_hourly'\n",
+        "  FROM\n",
+        "    silver_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Null Checks',\n",
+        "    'Null wind_speed_10m',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN wind_speed_10m IS NULL THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'NULL wind_speed_10m values in silver.weather_hourly'\n",
+        "  FROM\n",
+        "    silver_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Duplicate Checks',\n",
+        "    'Duplicate (location_id, forecast_ts) in silver',\n",
+        "    COUNT(*),\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COUNT(*)\n",
+        "      FROM\n",
+        "        silver_window\n",
+        "    ),\n",
+        "    'Silver rows in duplicated (location_id, forecast_ts) key groups'\n",
+        "  FROM\n",
+        "    silver_window s\n",
+        "      JOIN duplicate_silver_keys d\n",
+        "        ON s.location_id = d.location_id\n",
+        "        AND s.forecast_ts = d.forecast_ts\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Duplicate Checks',\n",
+        "    'Duplicate (forecast_date, location_id) in gold',\n",
+        "    COUNT(*),\n",
+        "    (\n",
+        "      SELECT\n",
+        "        COUNT(*)\n",
+        "      FROM\n",
+        "        gold_window\n",
+        "    ),\n",
+        "    'Gold rows in duplicated (forecast_date, location_id) key groups'\n",
+        "  FROM\n",
+        "    gold_window g\n",
+        "      JOIN duplicate_gold_keys d\n",
+        "        ON g.forecast_date = d.forecast_date\n",
+        "        AND g.location_id = d.location_id\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Range Validation',\n",
+        "    'Temperature within -50 to 60 C',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN\n",
+        "          avg_temp_c < -50\n",
+        "          OR avg_temp_c > 60\n",
+        "        THEN\n",
+        "          1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'Gold avg_temp_c values outside valid range'\n",
+        "  FROM\n",
+        "    gold_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Range Validation',\n",
+        "    'Humidity within 0 to 100 pct',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN\n",
+        "          avg_humidity_pct < 0\n",
+        "          OR avg_humidity_pct > 100\n",
+        "        THEN\n",
+        "          1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'Gold avg_humidity_pct values outside valid range'\n",
+        "  FROM\n",
+        "    gold_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Range Validation',\n",
+        "    'Precipitation within 0 to 500 mm',\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN\n",
+        "          total_precipitation_mm < 0\n",
+        "          OR total_precipitation_mm > 500\n",
+        "        THEN\n",
+        "          1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    ),\n",
+        "    COUNT(*),\n",
+        "    'Gold total_precipitation_mm values outside valid range'\n",
+        "  FROM\n",
+        "    gold_window\n",
+        "  UNION ALL\n",
+        "  SELECT\n",
+        "    'Freshness Validation',\n",
+        "    'Latest silver forecast within 48 hours',\n",
+        "    CASE\n",
+        "      WHEN f.hours_since_latest_forecast > 48 THEN 1\n",
+        "      ELSE 0\n",
+        "    END,\n",
+        "    1,\n",
+        "    CONCAT(\n",
+        "      'Hours since latest silver forecast: ',\n",
+        "      CAST(f.hours_since_latest_forecast AS STRING),\n",
+        "      ' (threshold: 48h)'\n",
+        "    )\n",
+        "  FROM\n",
+        "    (\n",
+        "      SELECT\n",
+        "        ROUND(\n",
+        "          (UNIX_TIMESTAMP(current_timestamp()) - UNIX_TIMESTAMP(MAX(forecast_ts))) / 3600.0,\n",
+        "          1\n",
+        "        ) AS hours_since_latest_forecast\n",
+        "      FROM\n",
+        "        silver_window\n",
+        "    ) f\n",
+        ")\n",
+        "SELECT\n",
+        "  check_category,\n",
+        "  check_name,\n",
+        "  CAST(violations AS BIGINT) AS violations,\n",
+        "  CAST(rows_checked AS BIGINT) AS rows_checked,\n",
+        "  details\n",
+        "FROM\n",
+        "  checks\n",
+        "ORDER BY\n",
+        "  check_category,\n",
+        "  check_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Start Date",
+          "keyword": "start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-30d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "End Date",
+          "keyword": "end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2027-12-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "City Name",
+          "keyword": "city_name",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Location ID",
+          "keyword": "location_id",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "columns": [
+        {
+          "displayName": "dq_status",
+          "description": "Data quality check result: PASS when no violations, otherwise FAIL.",
+          "expression": "CASE WHEN violations = 0 THEN 'PASS' ELSE 'FAIL' END"
+        }
+      ]
+    },
+    {
+      "name": "geo_weather",
+      "displayName": "Geo Weather by City",
+      "queryLines": [
+        "SELECT\n",
+        "  l.city_name,\n",
+        "  l.country,\n",
+        "  l.latitude,\n",
+        "  l.longitude,\n",
+        "  ROUND(AVG(g.avg_temp_c), 1) AS avg_temp_c,\n",
+        "  ROUND(SUM(g.total_precipitation_mm), 1) AS total_precipitation_mm,\n",
+        "  ROUND(MAX(g.max_wind_speed_kmh), 1) AS max_wind_speed_kmh,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        g.weather_alert IS NOT NULL\n",
+        "        AND TRIM(g.weather_alert) <> ''\n",
+        "      THEN\n",
+        "        1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS alert_count\n",
+        "FROM\n",
+        "  config.locations l\n",
+        "    INNER JOIN gold.daily_weather_summary g\n",
+        "      ON l.location_id = g.location_id\n",
+        "WHERE\n",
+        "  g.forecast_date BETWEEN :start_date AND :end_date\n",
+        "  AND (\n",
+        "    COALESCE(:city_name, 'All') = 'All'\n",
+        "    OR g.city_name = :city_name\n",
+        "  )\n",
+        "  AND (\n",
+        "    COALESCE(:location_id, 'All') = 'All'\n",
+        "    OR g.location_id = :location_id\n",
+        "  )\n",
+        "GROUP BY\n",
+        "  l.city_name,\n",
+        "  l.country,\n",
+        "  l.latitude,\n",
+        "  l.longitude\n",
+        "ORDER BY\n",
+        "  l.city_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Start Date",
+          "keyword": "start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-30d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "End Date",
+          "keyword": "end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2027-12-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "City Name",
+          "keyword": "city_name",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Location ID",
+          "keyword": "location_id",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "severe_conditions",
+      "displayName": "Severe Condition Days",
+      "queryLines": [
+        "WITH gold_window AS (\n",
+        "  SELECT\n",
+        "    *\n",
+        "  FROM\n",
+        "    gold.daily_weather_summary\n",
+        "  WHERE\n",
+        "    forecast_date BETWEEN :start_date AND :end_date\n",
+        "    AND (\n",
+        "      COALESCE(:city_name, 'All') = 'All'\n",
+        "      OR city_name = :city_name\n",
+        "    )    AND (\n",
+        "      COALESCE(:location_id, 'All') = 'All'\n",
+        "      OR location_id = :location_id\n",
+        "    )\n",
+        "    AND (\n",
+        "      (\n",
+        "        current_user() = 'srikanth.449@gmail.com'\n",
+        "        AND (\n",
+        "          COALESCE(:department, 'All') = 'All'\n",
+        "          OR location_id IN (\n",
+        "            SELECT dl2.location_id\n",
+        "            FROM config.department_locations dl2\n",
+        "            WHERE dl2.department = :department\n",
+        "          )\n",
+        "        )\n",
+        "      )\n",
+        "      OR (\n",
+        "        current_user() <> 'srikanth.449@gmail.com'\n",
+        "        AND location_id IN (\n",
+        "          SELECT l.location_id\n",
+        "          FROM config.locations l\n",
+        "          WHERE COALESCE(:department, 'All') = 'All'\n",
+        "            OR l.location_id IN (\n",
+        "              SELECT dl2.location_id\n",
+        "              FROM config.department_locations dl2\n",
+        "              WHERE dl2.department = :department\n",
+        "            )\n",
+        "        )\n",
+        "      )\n",
+        "    )\n",
+        "  )\n",
+        "SELECT\n",
+        "  'High Wind Days (max wind >= 50 km/h)' AS condition,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        (max_temp_c < 35 OR avg_humidity_pct < 80)\n",
+        "        AND max_wind_speed_kmh >= 50\n",
+        "      THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS day_count\n",
+        "FROM\n",
+        "  gold_window\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  'Extreme Heat Days (max temp >= 35 C, humidity >= 80%)',\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        max_temp_c >= 35\n",
+        "        AND avg_humidity_pct >= 80\n",
+        "      THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  )\n",
+        "FROM\n",
+        "  gold_window\n",
+        "UNION ALL\n",
+        "SELECT\n",
+        "  'Heavy Rain Days (precip >= 20 mm)',\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN\n",
+        "        (max_temp_c < 35 OR avg_humidity_pct < 80)\n",
+        "        AND max_wind_speed_kmh < 50\n",
+        "        AND total_precipitation_mm >= 20\n",
+        "      THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  )\n",
+        "FROM\n",
+        "  gold_window\n",
+        "ORDER BY\n",
+        "  day_count DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "Start Date",
+          "keyword": "start_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-30d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "End Date",
+          "keyword": "end_date",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "2027-12-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "City",
+          "keyword": "city_name",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Location",
+          "keyword": "location_id",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Department",
+          "keyword": "department",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "columns": [
+        {
+          "displayName": "severity",
+          "description": "Severity of severe condition days: OK when no days, CRITICAL for heavy rain, WARN for heat/wind.",
+          "expression": "CASE WHEN day_count = 0 THEN 'OK' WHEN condition LIKE 'Heavy Rain%' THEN 'CRITICAL' ELSE 'WARN' END"
+        }
+      ]
+    },
+    {
+      "name": "6a32f096",
+      "displayName": "dept_list",
+      "config": {
+        "version": "1.1",
+        "source": "SELECT DISTINCT department\r\nFROM config.department_locations\r\nWHERE allowed_user_email = CURRENT_USER()\r\n   OR CURRENT_USER() = 'srikanth.449@gmail.com'\r\nORDER BY department",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "executive_overview",
+      "displayName": "Executive Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "hero_title",
+            "spec": {
+              "version": 1,
+              "widgetType": "text",
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "# 🌦 Weather Intelligence"
+                  ],
+                  "fields": []
+                }
+              }
+            },
+            "specExtensions": {
+              "widgetBackgroundColor": {
+                "light": "#12223A",
+                "dark": "#12223A"
+              },
+              "widgetBorderColor": {
+                "light": "#2C4A73",
+                "dark": "#2C4A73"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 8,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "hbar_rainiest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "sum(total_precipitation_mm)",
+                      "expression": "SUM(`total_precipitation_mm`)"
+                    },
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rainiest Cities",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#4EA1FF"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(total_precipitation_mm)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "mini_latest_refresh",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "max(updated_at)",
+                      "expression": "MAX(`updated_at`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Latest Refresh",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(updated_at)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "hbar_hottest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "avg(avg_temp_c)",
+                      "expression": "AVG(`avg_temp_c`)"
+                    },
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Hottest Cities",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#FF9D4D"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "avg(avg_temp_c)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 21,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "avg(avg_temp_c)",
+                      "expression": "AVG(`avg_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Avg Temperature",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_temp_c)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }}°C",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "table_severe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "fields": [
+                    {
+                      "name": "condition",
+                      "expression": "`condition`"
+                    },
+                    {
+                      "name": "day_count",
+                      "expression": "`day_count`"
+                    },
+                    {
+                      "name": "severity",
+                      "expression": "`severity`"
+                    }
+                  ],
+                  "parameterValues": [
+                    {
+                      "keyword": "start_date",
+                      "selection": {}
+                    },
+                    {
+                      "keyword": "end_date",
+                      "selection": {}
+                    },
+                    {
+                      "keyword": "city_name",
+                      "selection": {}
+                    },
+                    {
+                      "keyword": "location_id",
+                      "selection": {}
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Severe Condition Summary",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "condition"
+                  },
+                  {
+                    "fieldName": "day_count"
+                  },
+                  {
+                    "fieldName": "severity"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 28,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rainy_days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "sum(rainy_day)",
+                      "expression": "SUM(`rainy_day`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rainy Days",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(rainy_day)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_max_wind",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "max(max_wind_speed_kmh)",
+                      "expression": "MAX(`max_wind_speed_kmh`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Max Wind Speed",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(max_wind_speed_kmh)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }} km/h",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_freshness",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(freshness_status)",
+                      "expression": "MAX(`freshness_status`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Data Freshness",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(freshness_status)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 4,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_dq_pass",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "measure(dq_pass_rate)",
+                      "expression": "MEASURE(`dq_pass_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "DQ Pass Rate",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(dq_pass_rate)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }}%",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 4,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_precip",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "sum(total_precipitation_mm)",
+                      "expression": "SUM(`total_precipitation_mm`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Precipitation Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#39D2FF"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_precipitation_mm)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "line_wind",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "max(max_wind_speed_kmh)",
+                      "expression": "MAX(`max_wind_speed_kmh`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Wind Speed Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#FF9D4D"
+                ],
+                "lineShape": "smooth"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "max(max_wind_speed_kmh)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 14,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "start_date_filter",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_start_date",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "parameters": [
+                    {
+                      "name": "start_date",
+                      "keyword": "start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_start_date",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "parameters": [
+                    {
+                      "name": "start_date",
+                      "keyword": "start_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Start Date",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "start_date",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_start_date"
+                  },
+                  {
+                    "parameterName": "start_date",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_start_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "end_date_filter",
+            "queries": [
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_end_date",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "parameters": [
+                    {
+                      "name": "end_date",
+                      "keyword": "end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_end_date",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "parameters": [
+                    {
+                      "name": "end_date",
+                      "keyword": "end_date"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "End Date",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-date-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "parameterName": "end_date",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_end_date"
+                  },
+                  {
+                    "parameterName": "end_date",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_end_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "city_name_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109db55f4637460c827a_city_name",
+                "query": {
+                  "datasetName": "locations_config",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "city_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_city_name",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "parameters": [
+                    {
+                      "name": "city_name",
+                      "keyword": "city_name"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_city_name",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "parameters": [
+                    {
+                      "name": "city_name",
+                      "keyword": "city_name"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "City",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "city_name",
+                    "queryName": "dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109db55f4637460c827a_city_name"
+                  },
+                  {
+                    "parameterName": "city_name",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_city_name"
+                  },
+                  {
+                    "parameterName": "city_name",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_city_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "mini_pipeline_health",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(success_rate_pct)",
+                      "expression": "MAX(`success_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Pipeline Health",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(success_rate_pct)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }}%",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "line_temp_min_avg_max",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "min(min_temp_c)",
+                      "expression": "MIN(`min_temp_c`)"
+                    },
+                    {
+                      "name": "avg(avg_temp_c)",
+                      "expression": "AVG(`avg_temp_c`)"
+                    },
+                    {
+                      "name": "max(max_temp_c)",
+                      "expression": "MAX(`max_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Daily Min, Max &amp; Avg Temperature",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#4EA1FF",
+                  "#39D2FF",
+                  "#FF9D4D"
+                ],
+                "linePatterns": [
+                  "dashed",
+                  "solid",
+                  "dashed"
+                ]
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "displayName": "Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "min(min_temp_c)",
+                      "displayName": "Min Temp (°C)"
+                    },
+                    {
+                      "fieldName": "avg(avg_temp_c)",
+                      "displayName": "Avg Temp (°C)"
+                    },
+                    {
+                      "fieldName": "max(max_temp_c)",
+                      "displayName": "Max Temp (°C)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_alert_breakdown",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "weather_alert",
+                      "expression": "`weather_alert`"
+                    },
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "count(location_id)",
+                      "expression": "COUNT(`location_id`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "weather_alert IN ('EXTREME_HEAT', 'HEAVY_RAIN', 'HIGH_WIND')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Alert Breakdown by City",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "city_name",
+                  "displayName": "City",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(location_id)",
+                  "displayName": "Alert Days",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "weather_alert",
+                  "displayName": "Alert Type",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "color": "#E53935",
+                        "value": "EXTREME_HEAT"
+                      },
+                      {
+                        "color": "#FFB300",
+                        "value": "HIGH_WIND"
+                      },
+                      {
+                        "color": "#4EA1FF",
+                        "value": "HEAVY_RAIN"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 28,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "department_filter",
+            "queries": [
+              {
+                "name": "dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5a7fac819f290a5b1550e085673_department",
+                "query": {
+                  "datasetName": "6a32f096",
+                  "fields": [
+                    {
+                      "name": "department",
+                      "expression": "`department`"
+                    },
+                    {
+                      "name": "department_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_department",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "parameters": [
+                    {
+                      "name": "department",
+                      "keyword": "department"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_department",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "parameters": [
+                    {
+                      "name": "department",
+                      "keyword": "department"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Department",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "department",
+                    "queryName": "dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5a7fac819f290a5b1550e085673_department"
+                  },
+                  {
+                    "parameterName": "department",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af11091abbf685e794e18ca_department"
+                  },
+                  {
+                    "parameterName": "department",
+                    "queryName": "parameter_dashboards/01f1e4d3fc851d54bba453eaed7c2637/datasets/01f1e5849af1109fb889d0880a3a57b4_department"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "pipeline_quality",
+      "displayName": "Pipeline & Data Quality",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_main",
+            "spec": {
+              "version": 1,
+              "widgetType": "text",
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "# 🔧 Pipeline, Audit & Data Quality"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 9,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "mini_pipeline_health",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(success_rate_pct)",
+                      "expression": "MAX(`success_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Pipeline Health",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(success_rate_pct)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "max"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }}%",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_pipeline",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Pipeline Monitoring",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "table_audit",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "start_time",
+                      "expression": "`start_time`"
+                    },
+                    {
+                      "name": "end_time",
+                      "expression": "`end_time`"
+                    },
+                    {
+                      "name": "silver_rows_merged",
+                      "expression": "`silver_rows_merged`"
+                    },
+                    {
+                      "name": "quarantined_rows",
+                      "expression": "`quarantined_rows`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Latest Audit Run",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "start_time"
+                  },
+                  {
+                    "fieldName": "end_time"
+                  },
+                  {
+                    "fieldName": "silver_rows_merged"
+                  },
+                  {
+                    "fieldName": "quarantined_rows"
+                  },
+                  {
+                    "fieldName": "error_message"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_audit",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Audit Summary",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_dq",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "count(check_name)",
+                      "expression": "COUNT(`check_name`)"
+                    },
+                    {
+                      "name": "dq_status",
+                      "expression": "`dq_status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "DQ Status Breakdown",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(check_name)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "dq_status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "table_dq",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "check_category",
+                      "expression": "`check_category`"
+                    },
+                    {
+                      "name": "dq_status",
+                      "expression": "`dq_status`"
+                    },
+                    {
+                      "name": "violations",
+                      "expression": "`violations`"
+                    },
+                    {
+                      "name": "rows_checked",
+                      "expression": "`rows_checked`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Latest Data Quality Checks",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "check_category"
+                  },
+                  {
+                    "fieldName": "dq_status"
+                  },
+                  {
+                    "fieldName": "violations"
+                  },
+                  {
+                    "fieldName": "rows_checked"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "b9878359",
+      "displayName": "Weather Intelligence",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_main",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "# 🌦 Weather Intelligence Dashboard\n",
+                    "Weather pipeline insights, monitoring, audit tracking, and data quality controls"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_gold",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🌤 Gold Insights\n",
+                    "Business view from the gold daily weather summary"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_trends",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 📈 Weather Trends\n",
+                    "Daily temperature, humidity, precipitation, and wind speed"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_locations",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🏙 Location Insights\n",
+                    "City rankings for rain, heat, and wind"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 34,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_alerts",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## ⚠️ Alerts\n",
+                    "Weather alert distribution and severe condition days"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 71,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_pipeline",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🔧 Pipeline Health\n",
+                    "Run status, duration, throughput, failures, and error summary"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 73,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_data_health",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🩺 Data Health\n",
+                    "Rows loaded vs rejected, freshness, success and failure rates"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 91,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_audit",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 📋 Pipeline Audit\n",
+                    "Run-level and location-level audit detail"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 105,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_dq",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🧪 Data Quality / Quarantine\n",
+                    "Null, duplicate, range, and freshness checks plus quarantined records"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 157,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "header_geo",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## 🌍 Geographic Overview\n",
+                    "Active locations and weather distribution by city"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 169,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_last_refresh",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "max(updated_at)",
+                      "expression": "MAX(`updated_at`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Latest Refresh Time",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(updated_at)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_freshness",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(freshness_hours)",
+                      "expression": "MAX(`freshness_hours`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Freshness Status (Hours Since Refresh)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(freshness_hours)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_active_locations",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "locations_config",
+                  "fields": [
+                    {
+                      "name": "sum(active_flag)",
+                      "expression": "SUM(`active_flag`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Active Locations",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(active_flag)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "avg(avg_temp_c)",
+                      "expression": "AVG(`avg_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Average Temperature (°C)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_temp_c)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rainy_days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "sum(rainy_day)",
+                      "expression": "SUM(`rainy_day`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rainy Days",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(rainy_day)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 8,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_alerts",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "sum(alert_count)",
+                      "expression": "SUM(`alert_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Weather Alerts",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(alert_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 8,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_max_wind",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "max(max_wind_speed_kmh)",
+                      "expression": "MAX(`max_wind_speed_kmh`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Max Wind Speed (km/h)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(max_wind_speed_kmh)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_precip",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "sum(total_precipitation_mm)",
+                      "expression": "SUM(`total_precipitation_mm`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Precipitation (mm)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_precipitation_mm)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 12,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_dq_pass_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "measure(dq_pass_rate)",
+                      "expression": "MEASURE(`dq_pass_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "DQ Pass Rate (%)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(dq_pass_rate)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 12,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_failed_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "sum(run_failed)",
+                      "expression": "SUM(`run_failed`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Failed Runs",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(run_failed)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 52,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_locations_attempted",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "sum(locations_attempted)",
+                      "expression": "SUM(`locations_attempted`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Locations Attempted",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(locations_attempted)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 52,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_locations_succeeded",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "sum(locations_succeeded)",
+                      "expression": "SUM(`locations_succeeded`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Locations Succeeded",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(locations_succeeded)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 55,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_silver_rows_merged",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "sum(silver_rows_merged)",
+                      "expression": "SUM(`silver_rows_merged`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Silver Rows Merged",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(silver_rows_merged)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 55,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_duration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "avg(duration_minutes)",
+                      "expression": "AVG(`duration_minutes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Avg Run Duration (Minutes)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(duration_minutes)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 59,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_quarantined_pipeline",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "sum(quarantined_rows)",
+                      "expression": "SUM(`quarantined_rows`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Quarantined Rows (Pipeline)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(quarantined_rows)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 75,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_total_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Total Runs",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(run_id)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 75,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rows_loaded",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(rows_loaded)",
+                      "expression": "MAX(`rows_loaded`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rows Loaded",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(rows_loaded)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 75,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rows_rejected",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(rows_rejected)",
+                      "expression": "MAX(`rows_rejected`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rows Rejected",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(rows_rejected)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 87,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_data_age",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(freshness_hours)",
+                      "expression": "MAX(`freshness_hours`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Data Age (Hours)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(freshness_hours)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 79,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_success_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(success_rate_pct)",
+                      "expression": "MAX(`success_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Success Rate (%)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(success_rate_pct)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 87,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_failure_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(failure_rate_pct)",
+                      "expression": "MAX(`failure_rate_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Failure Rate (%)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(failure_rate_pct)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 93,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_quarantine_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "data_health",
+                  "fields": [
+                    {
+                      "name": "max(quarantine_count)",
+                      "expression": "MAX(`quarantine_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Quarantine Count",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(quarantine_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 83,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "line_temperature",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "avg(avg_temp_c)",
+                      "expression": "AVG(`avg_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Temperature Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "displayName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(avg_temp_c)",
+                  "displayName": "avg_temp_c",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "line_humidity",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "avg(avg_humidity_pct)",
+                      "expression": "AVG(`avg_humidity_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Humidity Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "displayName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(avg_humidity_pct)",
+                  "displayName": "avg_humidity_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 18,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "line_precipitation",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "sum(total_precipitation_mm)",
+                      "expression": "SUM(`total_precipitation_mm`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Precipitation Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "displayName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_precipitation_mm)",
+                  "displayName": "total_precipitation_mm",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 26,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "line_wind",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "forecast_date",
+                      "expression": "`forecast_date`"
+                    },
+                    {
+                      "name": "max(max_wind_speed_kmh)",
+                      "expression": "MAX(`max_wind_speed_kmh`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Wind Speed Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "forecast_date",
+                  "displayName": "forecast_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "max(max_wind_speed_kmh)",
+                  "displayName": "max_wind_speed_kmh",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 26,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "line_rows_by_run",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "run_date",
+                      "expression": "`run_date`"
+                    },
+                    {
+                      "name": "sum(silver_rows_merged)",
+                      "expression": "SUM(`silver_rows_merged`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rows Loaded by Run Date",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "run_date",
+                  "displayName": "run_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(silver_rows_merged)",
+                  "displayName": "silver_rows_merged",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 97,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "line_runs_by_day",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "run_date",
+                      "expression": "`run_date`"
+                    },
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Runs by Day",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "run_date",
+                  "displayName": "run_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(run_id)",
+                  "displayName": "run_id",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 149,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_pipeline_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "start_time",
+                      "expression": "`start_time`"
+                    },
+                    {
+                      "name": "end_time",
+                      "expression": "`end_time`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "duration_minutes",
+                      "expression": "`duration_minutes`"
+                    },
+                    {
+                      "name": "locations_attempted",
+                      "expression": "`locations_attempted`"
+                    },
+                    {
+                      "name": "locations_succeeded",
+                      "expression": "`locations_succeeded`"
+                    },
+                    {
+                      "name": "silver_rows_merged",
+                      "expression": "`silver_rows_merged`"
+                    },
+                    {
+                      "name": "quarantined_rows",
+                      "expression": "`quarantined_rows`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Pipeline Runs (Latest First)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "start_time"
+                  },
+                  {
+                    "fieldName": "end_time"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "duration_minutes"
+                  },
+                  {
+                    "fieldName": "locations_attempted"
+                  },
+                  {
+                    "fieldName": "locations_succeeded"
+                  },
+                  {
+                    "fieldName": "silver_rows_merged"
+                  },
+                  {
+                    "fieldName": "quarantined_rows"
+                  },
+                  {
+                    "fieldName": "error_message"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 107,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_rainiest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "sum(total_precipitation_mm)",
+                      "expression": "SUM(`total_precipitation_mm`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rainiest Cities",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_precipitation_mm)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 36,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_location_audit",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "location_audit",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "http_status",
+                      "expression": "`http_status`"
+                    },
+                    {
+                      "name": "rows_extracted",
+                      "expression": "`rows_extracted`"
+                    },
+                    {
+                      "name": "schema_changes",
+                      "expression": "`schema_changes`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    },
+                    {
+                      "name": "logged_at",
+                      "expression": "`logged_at`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Location Audit (Latest First)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "city_name"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "http_status"
+                  },
+                  {
+                    "fieldName": "rows_extracted"
+                  },
+                  {
+                    "fieldName": "schema_changes"
+                  },
+                  {
+                    "fieldName": "error_message"
+                  },
+                  {
+                    "fieldName": "logged_at"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 181,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_hottest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "max(max_temp_c)",
+                      "expression": "MAX(`max_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Hottest Cities",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "max(max_temp_c)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 36,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_quarantine",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_quarantine",
+                  "fields": [
+                    {
+                      "name": "quarantine_id",
+                      "expression": "`quarantine_id`"
+                    },
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "stage",
+                      "expression": "`stage`"
+                    },
+                    {
+                      "name": "location_id",
+                      "expression": "`location_id`"
+                    },
+                    {
+                      "name": "forecast_ts",
+                      "expression": "`forecast_ts`"
+                    },
+                    {
+                      "name": "quarantine_reason",
+                      "expression": "`quarantine_reason`"
+                    },
+                    {
+                      "name": "quarantined_at",
+                      "expression": "`quarantined_at`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Latest Quarantine Records",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "quarantine_id"
+                  },
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "stage"
+                  },
+                  {
+                    "fieldName": "location_id"
+                  },
+                  {
+                    "fieldName": "forecast_ts"
+                  },
+                  {
+                    "fieldName": "quarantine_reason"
+                  },
+                  {
+                    "fieldName": "quarantined_at"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 171,
+            "width": 7,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_windiest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "max(max_wind_speed_kmh)",
+                      "expression": "MAX(`max_wind_speed_kmh`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Highest Wind Cities",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "max(max_wind_speed_kmh)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 36,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_geo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "geo_weather",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "avg_temp_c",
+                      "expression": "`avg_temp_c`"
+                    },
+                    {
+                      "name": "total_precipitation_mm",
+                      "expression": "`total_precipitation_mm`"
+                    },
+                    {
+                      "name": "alert_count",
+                      "expression": "`alert_count`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Active Locations &amp; Weather",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "city_name"
+                  },
+                  {
+                    "fieldName": "country"
+                  },
+                  {
+                    "fieldName": "latitude"
+                  },
+                  {
+                    "fieldName": "longitude"
+                  },
+                  {
+                    "fieldName": "avg_temp_c"
+                  },
+                  {
+                    "fieldName": "total_precipitation_mm"
+                  },
+                  {
+                    "fieldName": "alert_count"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 191,
+            "width": 4,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_severe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "severe_conditions",
+                  "fields": [
+                    {
+                      "name": "condition",
+                      "expression": "`condition`"
+                    },
+                    {
+                      "name": "sum(day_count)",
+                      "expression": "SUM(`day_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Severe Condition Summary",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "condition",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(day_count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 44,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_audit_summary",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Audit Summary: Success vs Failed",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 117,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_alert_distribution",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_gold",
+                  "fields": [
+                    {
+                      "name": "count(location_id)",
+                      "expression": "COUNT(`location_id`)"
+                    },
+                    {
+                      "name": "weather_alert",
+                      "expression": "`weather_alert`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "weather_alert IS NOT NULL AND TRIM(weather_alert) <> ''"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Weather Alert Distribution",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(location_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "weather_alert",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 44,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_pipeline_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "count(run_id)",
+                      "expression": "COUNT(`run_id`)"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Pipeline Status",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(run_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 52,
+            "width": 4,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_rows_by_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "location_audit",
+                  "fields": [
+                    {
+                      "name": "sum(rows_extracted)",
+                      "expression": "SUM(`rows_extracted`)"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Rows Extracted by Status",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(rows_extracted)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 79,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_quarantine_reason",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weather_quarantine",
+                  "fields": [
+                    {
+                      "name": "count(quarantine_id)",
+                      "expression": "COUNT(`quarantine_id`)"
+                    },
+                    {
+                      "name": "quarantine_reason",
+                      "expression": "`quarantine_reason`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Quarantine Reason Breakdown",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(quarantine_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "quarantine_reason",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 117,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_http_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "location_audit",
+                  "fields": [
+                    {
+                      "name": "count(location_id)",
+                      "expression": "COUNT(`location_id`)"
+                    },
+                    {
+                      "name": "http_status_code",
+                      "expression": "`http_status_code`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "HTTP Status Breakdown",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(location_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "http_status_code",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 125,
+            "width": 5,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "scatter_geo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "geo_weather",
+                  "fields": [
+                    {
+                      "name": "city_name",
+                      "expression": "`city_name`"
+                    },
+                    {
+                      "name": "avg_temp_c",
+                      "expression": "`avg_temp_c`"
+                    },
+                    {
+                      "name": "alert_count",
+                      "expression": "`alert_count`"
+                    },
+                    {
+                      "name": "total_precipitation_mm",
+                      "expression": "`total_precipitation_mm`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Weather Distribution by City (Geo)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "longitude",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "latitude",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "city_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "avg_temp_c"
+                  },
+                  {
+                    "fieldName": "alert_count"
+                  }
+                ],
+                "size": {
+                  "fieldName": "total_precipitation_mm",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 159,
+            "width": 8,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "table_error_summary",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "pipeline_runs",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "start_time",
+                      "expression": "`start_time`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "run_failed = 1"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Error Message Summary (Failed Runs)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "start_time"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "error_message"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 63,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_null_checks",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "violations",
+                      "expression": "`violations`"
+                    },
+                    {
+                      "name": "rows_checked",
+                      "expression": "`rows_checked`"
+                    },
+                    {
+                      "name": "details",
+                      "expression": "`details`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "check_category IN ('Null Checks')"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Null Checks",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "violations"
+                  },
+                  {
+                    "fieldName": "rows_checked"
+                  },
+                  {
+                    "fieldName": "details"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 125,
+            "width": 7,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_duplicate_checks",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "violations",
+                      "expression": "`violations`"
+                    },
+                    {
+                      "name": "rows_checked",
+                      "expression": "`rows_checked`"
+                    },
+                    {
+                      "name": "details",
+                      "expression": "`details`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "check_category IN ('Duplicate Checks')"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Duplicate Checks",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "violations"
+                  },
+                  {
+                    "fieldName": "rows_checked"
+                  },
+                  {
+                    "fieldName": "details"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 133,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_range_validation",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "violations",
+                      "expression": "`violations`"
+                    },
+                    {
+                      "name": "rows_checked",
+                      "expression": "`rows_checked`"
+                    },
+                    {
+                      "name": "details",
+                      "expression": "`details`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "check_category IN ('Range Validation')"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Range Validation",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "violations"
+                  },
+                  {
+                    "fieldName": "rows_checked"
+                  },
+                  {
+                    "fieldName": "details"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 133,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "table_freshness_validation",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_checks",
+                  "fields": [
+                    {
+                      "name": "check_name",
+                      "expression": "`check_name`"
+                    },
+                    {
+                      "name": "violations",
+                      "expression": "`violations`"
+                    },
+                    {
+                      "name": "rows_checked",
+                      "expression": "`rows_checked`"
+                    },
+                    {
+                      "name": "details",
+                      "expression": "`details`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "check_category IN ('Freshness Validation')"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Freshness Validation",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "check_name"
+                  },
+                  {
+                    "fieldName": "violations"
+                  },
+                  {
+                    "fieldName": "rows_checked"
+                  },
+                  {
+                    "fieldName": "details"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 141,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "excludeFromPublished": true
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#0B1526",
+        "dark": "#0B1526"
+      },
+      "widgetBackgroundColor": {
+        "light": "#12223A",
+        "dark": "#12223A"
+      },
+      "widgetBorderColor": {
+        "light": "#2C4A73",
+        "dark": "#2C4A73"
+      },
+      "fontColor": {
+        "light": "#11171C",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#4EA1FF",
+        "dark": "#4EA1FF"
+      },
+      "visualizationColors": [
+        "#4EA1FF",
+        "#39D2FF",
+        "#33D6A6",
+        "#47D16C",
+        "#FFCB57",
+        "#FF9D4D",
+        "#FF5D6C"
+      ],
+      "widgetHeaderAlignment": "LEFT",
+      "widgetPadding": 16,
+      "widgetMargin": 16,
+      "widgetCornerRadius": 16,
+      "widgetShadow": 40,
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#E6EEF8",
+            "dark": "#E6EEF8"
+          },
+          "fontSize": 13
+        },
+        "widgetTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#FFFFFF",
+            "dark": "#FFFFFF"
+          },
+          "fontSize": 16,
+          "fontWeight": 600
+        },
+        "widgetDescription": {
+          "fontColor": {
+            "light": "#B8C7DC",
+            "dark": "#B8C7DC"
+          }
+        },
+        "fieldTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#C9D8EC",
+            "dark": "#C9D8EC"
+          },
+          "fontSize": 12
+        },
+        "fieldValue": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#E6EEF8",
+            "dark": "#E6EEF8"
+          },
+          "fontSize": 12
+        }
+      },
+      "gridLineColor": {
+        "light": "#23364F",
+        "dark": "#23364F"
+      },
+      "axisLineColor": {
+        "light": "#3C5A80",
+        "dark": "#3C5A80"
+      },
+      "visualizationColorMappings": [
+        {
+          "value": "SUCCESS",
+          "color": "#47D16C"
+        },
+        {
+          "value": "FAILED",
+          "color": "#FF5D6C"
+        },
+        {
+          "value": "NORMAL",
+          "color": "#47D16C"
+        },
+        {
+          "value": "HEAVY_RAIN",
+          "color": "#4EA1FF"
+        },
+        {
+          "value": "PASS",
+          "color": "#47D16C"
+        },
+        {
+          "value": "FAIL",
+          "color": "#FF5D6C"
+        },
+        {
+          "value": "WARN",
+          "color": "#FFCB57"
+        },
+        {
+          "value": "CRITICAL",
+          "color": "#FF5D6C"
+        },
+        {
+          "value": "OK",
+          "color": "#47D16C"
+        },
+        {
+          "value": "Fresh",
+          "color": "#47D16C"
+        },
+        {
+          "value": "200",
+          "color": "#47D16C"
+        }
+      ]
+    },
+    "applyModeEnabled": false
+  }
+}

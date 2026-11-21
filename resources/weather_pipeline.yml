@@ -1,0 +1,47 @@
+resources:
+  jobs:
+    open_meteo_weather_pipeline:
+      name: "open_meteo_weather_pipeline"
+      parameters:
+        - name: catalog_name
+          default: ${var.catalog_name}
+      tasks:
+        - task_key: ingest_bronze
+          max_retries: 2
+          min_retry_interval_millis: 30000
+          notebook_task:
+            notebook_path: ../src/02_ingest_bronze.ipynb
+            source: WORKSPACE
+          run_if: ALL_SUCCESS
+        - task_key: transform_silver
+          depends_on:
+            - task_key: ingest_bronze
+          max_retries: 1
+          min_retry_interval_millis: 15000
+          notebook_task:
+            notebook_path: ../src/03_transform_silver.ipynb
+            source: WORKSPACE
+          run_if: ALL_SUCCESS
+        - task_key: build_gold_and_audit
+          depends_on:
+            - task_key: transform_silver
+          max_retries: 1
+          min_retry_interval_millis: 15000
+          notebook_task:
+            notebook_path: ../src/04_build_gold_and_audit.ipynb
+            source: WORKSPACE
+          run_if: ALL_SUCCESS
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+      notification_settings:
+        no_alert_for_skipped_runs: false
+      max_concurrent_runs: 1
+      performance_target: PERFORMANCE_OPTIMIZED
+      queue:
+        enabled: true
+      trigger:
+        pause_status: ${var.trigger_status}
+        periodic:
+          interval: 1
+          unit: HOURS

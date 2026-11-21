@@ -1,0 +1,8 @@
+resources:
+  dashboards:
+    weather_intelligence_dashboard:
+      display_name: "[${bundle.target}] Weather Intelligence Dashboard"
+      file_path: ../src/dashboards/Weather Intelligence Dashboard.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.catalog_name}
+      embed_credentials: false
