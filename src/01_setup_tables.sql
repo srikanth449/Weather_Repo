@@ -35,6 +35,7 @@ INSERT INTO config.pipeline_params VALUES
 ('base_url', 'https://api.open-meteo.com/v1/forecast'),
 ('hourly_vars', 'temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m'),
 ('forecast_days', '5'),
+('max_retries', '3'),
 ('expected_hourly_schema', '{"time": "str", "temperature_2m": "float", "relative_humidity_2m": "int", "precipitation": "float", "wind_speed_10m": "float"}');
 
 -- 3. Bronze: Append-only raw API responses

@@ -1,0 +1,12 @@
+[project]
+name = "weather-intelligence-dab"
+version = "0.0.0"
+
+[dependency-groups]
+dev = [
+    "databricks-connect~=18.2.0",
+]
+
+[tool.databricks.environment]
+environment_version = "5"
+
